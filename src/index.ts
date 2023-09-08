@@ -1,58 +1,93 @@
-import { Elysia, t } from "elysia";
-import { drizzle } from 'drizzle-orm/postgres-js'
-import postgres from "postgres";
-import { users } from "../drizzle/schema";
+import { Elysia, t } from 'elysia';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import { users } from './db/schema';
+import { eq } from 'drizzle-orm';
 
-const dbUrl = process.env.RAILWAY_DB_URL as string
+const dbUrl = process.env.RAILWAY_DB_URL as string;
 
-const client = postgres(dbUrl)
-const db = drizzle(client)
+const client = postgres(dbUrl);
+const db = drizzle(client);
 
-const allUser = await db.select().from(users);
+interface bodyObj {
+  id?: number;
+  email: string;
+  username: string;
+  password: string;
+}
 
-interface body {
-  id?: number
-  full_name: string,
-  phone: string
-};
+async function createUser(body: bodyObj) {
+  const hashPassword = await Bun.password.hash(body.password);
+  const user = await db
+    .insert(users)
+    .values({ email: body.email, password: hashPassword, username: body.username });
+  return `You are signed Up ${user}`;
+}
 
-async function signIn(body: body) {
-  const allUsers = await db.select().from(users)
-  const getUser = allUsers.find(user => user.full_name === body.full_name)
-  if (getUser) {
-    return `You are logged in successfully.`
+async function updateUser(body: bodyObj, id: string) {
+  const allUser = await db.select().from(users);
+  const getUser = allUser.find((user) => user.id === +id);
+
+  if (!getUser) {
+    return `User with ${id} does not exit`;
   }
-  return `Invalid credentials`
+
+  const updatedUser = await db
+    .update(users)
+    .set({ email: body.email, username: body.username })
+    .where(eq(users.id, +id));
+  console.log(`User Created`);
+  return updatedUser;
 }
 
-async function signUp(body: body) {
-  await db.insert(users).values({ id: body.id, full_name: body.full_name, phone: body.phone })
-  return `You are signed Up`
+async function removeUser(id: string) {
+  const allUser = await db.select().from(users);
+  const getUser = allUser.find((user) => user.id === +id);
+
+  if (!getUser) {
+    return `User with ${id} does not exit`;
+  }
+  const user = await db.delete(users).where(eq(users.id, +id));
+  return user;
 }
 
-const app = new Elysia()
-  .get("/", () => "Hello Elysia")
-  .get("/users", () => ({
-    users: allUser
-  }))
-  .post("/sign-up", ({ body }) => signUp(body), {
-    body: t.Object({
-      id: t.Number(),
-      full_name: t.String(),
-      phone: t.String()
-    })
-  })
-  .post("/sign-in", ({ body }) => signIn(body), {
-    body: t.Object({
-      full_name: t.String(),
-      phone: t.String()
-    })
-  })
-  .get("/dashboard/:name", (({ params: { name } }) => ({
-    message: `Here is your dashboard with ${name}`
-  })))
-  .listen(3000)
+async function getAllUsers() {
+  return await db.select().from(users);
+}
 
-console.log(
-  `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
+const app = new Elysia();
+
+app.get('/', () => ({
+  message: 'Hello Elysia with drizzle',
+}));
+
+app.get('/users', getAllUsers);
+
+app.post('/user', ({ body }) => createUser(body), {
+  body: t.Object({
+    email: t.String(),
+    username: t.String(),
+    password: t.String(),
+  }),
+});
+
+app.patch(
+  '/user/:id',
+  ({ params: { id }, body }) => {
+    updateUser(body as bodyObj, id);
+  },
+  {
+    body: t.Object({
+      email: t.String(),
+      username: t.String(),
+    }),
+  }
 );
+
+app.delete('/user/:id', ({ params: { id } }) => {
+  removeUser(id);
+});
+
+app.listen(3000, () => {
+  console.log(`🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`);
+});

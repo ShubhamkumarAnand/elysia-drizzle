@@ -1,0 +1,20 @@
+{
+  "version": "5",
+  "dialect": "pg",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1694160974189,
+      "tag": "0000_useful_ma_gnuci",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1694167787229,
+      "tag": "0001_tearful_stardust",
+      "breakpoints": true
+    }
+  ]
+}
